@@ -1,0 +1,1845 @@
+#!/bin/bash
+#
+# Copyright(C) 1993-2011 Adobe Systems Incorporated. All rights reserved.
+#
+# Adobe Flash Media Server Installer
+#
+
+PRODUCT="Adobe Flash Media Server"
+VERSION="4.5"
+
+# Environment variables
+PATH=.:/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:$PATH
+export PATH
+
+# Get the path of this script
+cwd=`dirname $0`
+
+# setup NLS path
+NLSPATH=$cwd/tcSrvMsg:$NLSPATH
+export NLSPATH
+
+# License text file
+LICENSE=License.txt
+
+
+##############################
+# Subroutines
+##############################
+
+# the os is not supported
+exit_wrong_platform () {
+# check distribution
+DISTRO=`check_distro`
+
+case $DISTRO in
+    redhat-73-i386)
+                    exit_redhat $DISTRO
+                    ;;
+    redhat-80-i386)
+                    exit_redhat $DISTRO
+                    ;;
+    redhat-RHEL3-i686)
+                    exit_redhat $DISTRO
+                    ;;
+    redhat-RHEL4-i686)
+                    exit_redhat $DISTRO
+                   ;;
+    centos-4-i686)
+                    exit_redhat $DISTRO
+                    ;;
+
+                 *)
+                    ;;
+esac
+  exit_platform $DISTRO
+}
+
+# the redhat is old
+exit_redhat () {
+  echo ""
+  echo "ERROR: The older Linux version $1 is detected and not supported"
+  echo "       by the $PRODUCT installer."
+  echo "       Please upgrade OS to the latest version."
+  echo ""
+  exit 1
+}
+
+# the platform is not supported
+exit_platform () {
+os=`uname -s`
+if [ "X$os" != "XLinux" ]; then
+  os=`uname -s`
+  echo ""
+  echo "ERROR: You are running the $PRODUCT installer"
+  echo "       on the wrong $os platform."
+  echo ""
+else
+  echo ""
+  echo "ERROR: The older Linux version $1 is detected and not supported"
+  echo "       by the $PRODUCT installer."
+  echo "       Please upgrade OS to the latest version."
+  echo ""
+fi
+  exit 1
+}
+
+# the os is not supported
+exit_os () {
+  echo ""
+  echo "ERROR: Your operating system is not supported by the"
+  echo "       $PRODUCT installer."
+  echo ""
+  exit 1
+}
+warn_os () {
+  echo ""
+  echo "WARNING: Your operating system is not supported by the"
+  echo "         $PRODUCT installer."
+  echo ""
+}
+
+# the architecture is not supported
+exit_cpu () {
+  echo ""
+  echo "ERROR: Your architecture, \'$1\', is not supported by the"
+  echo "       $PRODUCT installer."
+  echo ""
+  exit 1
+}
+warn_cpu () {
+  echo ""
+  echo "WARNING: Your architecture, \'$1\', is not supported by the"
+  echo "         $PRODUCT installer."
+  echo ""
+}
+
+warn_32 () {
+  DISTRO=`check_distro`
+
+  echo "WARNING: You are running the 32 bit $PRODUCT installer"
+  echo "         on the Linux $1 $DISTRO platform."
+  echo "         Please be aware that $1 $PRODUCT is available."
+  echo ""
+}
+
+exit_no_libnspr () {
+  DISTRO=`check_distro`
+
+  echo "ERROR: A required package, libnspr4, was not found on your Linux $1 $DISTRO."
+  echo "       Please install required package and run $PRODUCT installer again."
+  echo ""
+  exit 1
+}
+
+exit_no_libcap () {
+  DISTRO=`check_distro`
+
+  echo "ERROR: A required package, libcap, was not found on your Linux $1 $DISTRO."
+  echo "       Please install required package and run $PRODUCT installer again."
+  echo ""
+  exit 1
+}
+
+exit_wrong_libcap () {
+  DISTRO=`check_distro`
+
+  echo "ERROR: RPM for libcap.so on your Linux $1 $DISTRO causing problem."
+  echo "       Please reinstall required package and run $PRODUCT installer again."
+  echo ""
+  exit 1
+}
+
+# the recognized distribution is not supported
+exit_unsupported () {
+  echo ""
+  echo "ERROR: Your Linux distribution, $1, is not supported by this"
+  echo "       $PRODUCT installer."
+  echo ""
+  exit 1
+}
+warn_unsupported () {
+  echo ""
+  echo "WARNING: Your Linux distribution, $1  is not supported by this"
+  echo "         $PRODUCT installer."
+  echo ""
+}
+
+# check distribution
+check_distro () {
+
+  cd_result () {
+    echo "$1"
+    exit
+  }
+
+  cd_check () {
+    grep "$1" "$2" >/dev/null 2>&1
+    if [ $? = 0 ]; then
+      cd_result "$3"
+    fi
+  }
+
+  DIST=unknown
+  # Red Hat Linux
+  if [ -f /etc/redhat-release ]; then
+  cd_check "Red Hat Enterprise Linux [WAE]S release 3" /etc/redhat-release redhat-RHEL3-i686
+  cd_check "Red Hat Enterprise Linux [WAE]S release 4" /etc/redhat-release redhat-RHEL4-i686
+   cd_check "Red Hat Enterprise Linux Server release 5" /etc/redhat-release redhat-RHEL5-i686
+  cd_check "Red Hat Enterprise Linux Client release 5" /etc/redhat-release redhat-RHEL5-i686
+  cd_check "CentOS release 4" /etc/redhat-release centos-4-i686
+  cd_check "CentOS release 5" /etc/redhat-release centos-5-i686
+  DIST='RedHat'
+  PSUEDONAME=`cat /etc/redhat-release | sed s/.*\(// | sed s/\)//`
+  REV=`cat /etc/redhat-release | sed s/.*release\ // | sed s/\ .*//`
+    DIST="${DIST} ${REV} ${PSUEDONAME}"
+  cd_result $DIST
+    #uknown Linux??
+ elif [ -f /etc/SUSE-release ] ; then
+  DIST=`cat /etc/SUSE-release | tr "\n" ' '| sed s/VERSION.*//`
+  REV=`cat /etc/SUSE-release | tr "\n" ' ' | sed s/.*=\ //`
+ elif [ -f /etc/mandrake-release ] ; then
+  DIST='Mandrake'
+  PSUEDONAME=`cat /etc/mandrake-release | sed s/.*\(// | sed s/\)//`
+  REV=`cat /etc/mandrake-release | sed s/.*release\ // | sed s/\ .*//`
+ elif [ -f /etc/debian_version ] ; then
+  DIST="Debian `cat /etc/debian_version`"
+  REV=""
+ fi
+ if [ -f /etc/UnitedLinux-release ] ; then
+  DIST="${DIST}[`cat /etc/UnitedLinux-release | tr "\n" ' ' | sed s/VERSION.*//`]"
+ fi
+ DIST="${DIST} ${REV} ${PSUEDONAME}"
+ cd_result $DIST
+
+}
+
+
+##############################
+# Main Section
+##############################
+
+WARN=0
+
+# check command-line arguments
+while [ $# -gt 0 ]; do
+  case $1 in
+    -platformWarnOnly) WARN=1
+                       shift
+                       ;;
+                    *) echo ""
+                       echo "Usage: installFMS [OPTION]..."
+                       echo "  -platformWarnOnly    warn if running installer on invalid platform"
+                       echo "  -usage               display this help and exit"
+                       echo ""
+                       exit 1
+                       ;;
+  esac
+done
+
+# check user
+USERID=`id | sed -e 's/).*//; s/^.*(//;'`
+if [ "X$USERID" != "Xroot" ]; then
+  echo ""
+  echo "ERROR: You must be logged in as the root user to install"
+  echo "       the $PRODUCT."
+  echo ""
+  exit 1
+fi
+
+# check OS
+os=`uname -s`
+if [ "X$os" != "XLinux"  ]; then
+  if [ $WARN -eq 1 ]; then
+    warn_os
+  else
+    exit_os
+  fi
+fi
+
+# check architecture
+INSTALL_32_ON_64=0
+MODE=`file "$cwd/fmsini" | grep "64-bit"`
+TEMPARCH=`uname -m`
+if [ "$MODE" = "" ]; then
+  #32 bit installer
+  if [ "$TEMPARCH" = "x86_64" ]; then
+  warn_32 $TEMPARCH
+  INSTALL_32_ON_64=1
+  fi
+else
+  #not 32 bit installer
+  if [ "$TEMPARCH" != "x86_64" ]; then
+  exit_cpu $TEMPARCH
+  fi
+fi
+
+# check platform correctness of exec
+RETVAL=`$cwd/fmsini -help`
+if [ $? -ne 0 ]; then
+  exit_wrong_platform
+fi
+
+LINK_LIBCAP2=0
+#check libcap installed
+RETVAL=`ldd $cwd/fmsedge | sed -n -e '/libcap.so/p' | grep "not found"`
+if [ "$RETVAL" != "" ]; then
+  if [ -f /lib/libcap.so.2 ]; then
+
+    LINK_LIBCAP2=1
+
+  else
+  exit_no_libcap $TEMPARCH
+fi
+fi
+
+#check libnspr installed
+RETVAL=`ldd $cwd/fmscore | sed -n -e '/libnspr/p' | grep "not found"`
+if [ "$RETVAL" != "" ]; then
+  exit_no_libnspr $TEMPARCH
+fi
+
+
+case $TEMPARCH in
+  i[3456]86) ARCH=i386
+             ;;
+     x86_64) ARCH=i386_x64
+       ;;
+          *) if [ $WARN -eq 1 ]; then
+               warn_cpu $TEMPARCH
+             else
+               exit_cpu $TEMPARCH
+             fi
+             ;;
+esac
+
+# check distribution
+PLATFORM="Linux"
+DISTRO=`check_distro`
+
+case $DISTRO in
+    redhat-RHEL5-i686)
+                    ;;
+    centos-5-i686)
+                    ;;
+	Debian)
+		;;
+                 *) if [ $WARN -eq 0 ]; then
+            warn_unsupported "$DISTRO $ARCH"
+                    fi
+                    ;;
+esac
+
+
+##################
+# Welcome user
+##################
+echo ""
+echo "Copyright(C) 1993-2011 Adobe Systems Incorporated. All rights reserved."
+echo ""
+echo "$PRODUCT $VERSION for $PLATFORM"
+echo ""
+echo "$PRODUCT $VERSION will be installed on this machine."
+echo ""
+echo "You will be asked a series of questions during the install"
+echo "process and will be presented with the defaults for these questions."
+echo ""
+echo "Support is available at http://www.adobe.com/go/flashmediaserver_en"
+echo ""
+echo "To install $PRODUCT now, press ENTER."
+echo ""
+echo "To cancel the installation at any time, press Control-C."
+echo ""
+
+### !!!
+### !!!
+### !!! PUPPET MODULE CUSTOMIZATION
+### !!!
+### !!! Piping in directly from /dev/tty prevents us from automating this step,
+### !!! so we need to either comment it out or modify it to just continue
+### !!! automatically. Doing the latter.
+### !!!
+### !!!
+### !!!
+#
+# read cont < /dev/tty
+#
+
+#########################
+# Show license agreement
+#########################
+if [ -f "$cwd/$LICENSE" ]; then
+more "$cwd/$LICENSE"
+get_agreement () {
+  echo ""
+  printf "Do you agree with the license agreement? (y/n): "
+  read yn
+
+  case $yn in
+    y | Y) ;;
+    n | N) exit
+           ;;
+        *) echo ""
+           echo "Please enter 'y' or 'n'."
+           get_agreement
+           ;;
+  esac
+}
+get_agreement
+fi
+
+ask_mm_fms () {
+    echo ""
+    echo ""
+    echo "WARNING: A previous installation has been found at /opt/adobe/fms"
+    echo ""
+    echo "Do you want to continue installing $PRODUCT without deleting the old version?"
+    echo "Continue [y] or Quit [q] ? (y/q)"
+    printf "Default [y]: "
+    read yn
+
+    # if user pressed return, use default
+    if [ -z "$yn" ]; then
+    yn=Y
+    fi
+
+    case $yn in
+    y | Y) MM_FMS=1
+         ;;
+    q | Q) exit
+         ;;
+      *) echo ""
+         echo "Please enter 'y' or 'q'."
+         ask_mm_fms
+         ;;
+    esac
+}
+
+if [ -e "/opt/macromedia/fms" ]; then
+  ask_mm_fms
+fi
+
+
+# display previous SN
+prompt_saved_keys () {
+  ans=""
+  echo ""
+  echo "A key has been found from the previous install location of `cat $SERVICES_DIR/fms`/conf/fms.ini"
+  printf "    Do you want to input this key: $2 ? (y/n): "
+  read yn
+
+  case $yn in
+    y | Y) ans="$2"
+           ;;
+    n | N) ans=""
+     echo ""
+     echo "You have selected not to use the key that was found."
+     echo "Please enter an alternative serial number."
+           ;;
+        *) echo ""
+           echo "Please enter 'y' or 'n'."
+           prompt_saved_keys ans $2
+           ;;
+  esac
+  eval "$1=\"$ans\""
+}
+
+
+
+#Loop until user is comfortable with their choices
+okToProceed=0
+export LD_LIBRARY_PATH="$cwd${LD_LIBRARY_PATH:+:}$LD_LIBRARY_PATH"
+while [ $okToProceed -eq 0 ]; do
+
+  # default variables
+  INSTALLDIR=/opt/adobe/fms
+  SERVICES_DIR=/etc/adobe/fms/services
+  CREATE_ETC_MACR_DIR=0
+  RUN_AS_DAEMON=1
+  START=1
+  SWITCH_ADMIN=0
+  OVERWRITE=0
+  INSTALL_EXAMPLES=0
+  PREV_INSTALL_FOUND=0
+
+  ############################
+  # Check /etc/adobe/fms
+  ############################
+  SERVICE_NAME="fms"
+  if [ ! -d "/etc/adobe/fms/services" ]; then
+    # use default service name
+    CREATE_ETC_MACR_DIR=1
+  else
+    # setup /etc/adobe/fms dir
+    # check for fmsadmin service
+    if [ -f "$SERVICES_DIR/fmsadmin" ]; then
+      SWITCH_ADMIN=1
+    fi
+  fi
+
+  ############################
+  # fetch license keys
+  ############################
+  FMSINI="`cat $SERVICES_DIR/fms 2>/dev/null`/conf/fms.ini"
+  if [ -f "$FMSINI" ]; then
+    SAVED_KEYS=`grep -e "^SERVER.LICENSEINFO" $FMSINI | sed 's/SERVER.LICENSEINFO\?.=//' `
+    key1=`echo $SAVED_KEYS | cut -d";" -f 1`
+    key2=`echo $SAVED_KEYS | cut -d";" -f 2`
+  fi
+
+  #############################
+  # ask for serial number
+  #############################
+  SERIALNUM=""
+  endGetSN=0
+  return_val=0
+  get_serialnumber() {
+  sifbin=$2
+        savedKey=$3
+        ans=""
+  if [ $savedKey ]; then
+     prompt_saved_keys ans $savedKey
+        fi
+
+  if [ ! -z $ans ]; then
+           ret_val=`$cwd/checksn -k $ans $2`
+           currentSN=$ans
+        else
+     read in
+     if [ ! -z "$in" ]; then
+    ret_val=`$cwd/checksn -k $in $2`
+    currentSN=$in
+     else
+    ret_val=253
+     fi
+  fi
+  eval "$1=\"$ret_val\""
+  }
+
+  tryagain () {
+    printf "Would you like to try again? y/n:  "
+    printf "Default [n]: "
+    read yn
+
+    if [ -z "$yn" ]; then
+  yn="n"
+    fi
+
+    case $yn in
+      y | Y) endGetSN=0
+             ;;
+      n | N) endGetSN=1
+             ;;
+          *) echo ""
+             echo "Please enter 'y' or 'n'"
+       tryagain
+             ;;
+    esac
+  }
+
+
+  while [ $endGetSN -eq 0 ]; do
+  oldkey=""
+  if [ $key2 ]; then
+	oldkey=$key2
+  else
+	if [ $key1 ]; then
+		oldkey=$key1
+	fi
+  fi
+
+  return=0
+  if [ $oldkey ]; then
+	ret=`$cwd/checksn -k $oldkey -t 45 -p $cwd/licenses/sif45.bin`
+
+	if [ $ret -eq "4005375" ]; then
+		return=1
+	elif [ $ret -eq "4005376" ]; then
+		return=1
+	elif [ $ret -eq "4005377" ]; then
+		return=1
+	elif [ $ret -eq "4005378" ]; then
+		return=1
+	elif [ $ret -eq "4005373" ]; then
+		return=1
+	elif [ $ret -eq "4005374" ]; then
+		return=1
+	elif [ $ret -eq "4005462" ]; then
+		return=1
+	else
+        return=0
+    fi
+  fi
+
+  if [ $return -eq 0 ]; then
+  echo ""
+  printf "Please enter your Adobe Flash Media Server $VERSION serial number."
+  echo ""
+  ret=0
+  get_serialnumber ret "-t 45 -p $cwd/licenses/sif45.bin"
+  else
+    key2=""
+	key1=""
+	echo ""
+	echo "Adobe Flash Media Server $VERSION serial number key has been found"
+	echo "from the previous install location of"
+	echo "`cat $SERVICES_DIR/fms`/conf/fms.ini"
+	printf "Do you want to input this key: $oldkey ? (y/n Default [n]): "
+	read yn
+
+	case $yn in
+		y | Y)
+		;;
+		n | N |*)
+			echo ""
+			echo "You have selected not to use the key that was found."
+			echo "Please enter an alternative Adobe Flash Media Server $VERSION serial number."
+			get_serialnumber ret "-t 45 -p $cwd/licenses/sif45.bin"
+		;;
+	 esac
+  fi
+
+  case $ret in
+    "4005375")
+    echo ""
+    echo "You have entered an upgrade serial number for Adobe Flash Media Server $VERSION."
+    echo "The serial number entered requries a valid Adobe Flash Media Server 3.x"
+    echo "Interactive Server serial number."
+    echo ""
+    echo "Please enter the serial number."
+    SERIALNUM=$currentSN
+    ret=0
+    if [ ! -z $key2 ]; then
+       get_serialnumber ret "-t 35 -p $cwd/licenses/sif35.bin" $key2
+    elif [ ! -z $key1 ]; then
+       get_serialnumber ret "-t 35 -p $cwd/licenses/sif35.bin" $key1
+    else
+       get_serialnumber ret "-t 35 -p $cwd/licenses/sif35.bin"
+    fi
+
+    if [ $ret -eq "3005003" ]; then
+        return_val=1
+    elif [ $ret -eq "3005373" ]; then
+        return_val=1
+    elif [ $ret -eq "3005376" ]; then
+        return_val=1
+    else
+        return_val=0
+    fi
+
+     if [ $return_val -eq 1 ]; then
+      echo ""
+      echo "Congratulations, you have enabled the"
+      echo "Adobe Flash Media Interactive Server!"
+      echo ""
+      SERIALNUM="$currentSN;$SERIALNUM"
+      endGetSN=1
+    else
+	  # check 30 key
+	  ret=0
+	  if [ ! -z $key2 ]; then
+	    ret=`$cwd/checksn -k $currentSN -t 30 -p $cwd/licenses/sif.bin $key2`
+      elif [ ! -z $key1 ]; then
+        ret=`$cwd/checksn -k $currentSN -t 30 -p $cwd/licenses/sif.bin $key1`
+      else
+        ret=`$cwd/checksn -k $currentSN -t 30 -p $cwd/licenses/sif.bin`
+      fi
+
+      if [ $ret -eq "3000003" ]; then
+        return_val=1
+      elif [ $ret -eq "3000373" ]; then
+        return_val=1
+      elif [ $ret -eq "3000376" ]; then
+         return_val=1
+       else
+         return_val=0
+      fi
+
+	  if [ $return_val -eq 1 ]; then
+         echo ""
+         echo "Congratulations, you have enabled the"
+         echo "Adobe Flash Media Interactive Server!"
+         echo ""
+         SERIALNUM="$currentSN;$SERIALNUM"
+         endGetSN=1
+      else
+         echo ""
+         echo "An invalid serial number was entered during the"
+         echo "upgrade process. Falling back to the "
+         echo "Adobe Flash Media Development Server."
+         echo ""
+         tryagain
+       fi
+    fi
+    ;;
+    "4005376")
+    echo ""
+    echo "You have entered an upgrade serial number for Adobe Flash Media Server $VERSION."
+    echo "The serial number entered requries a valid Adobe Flash Media Server 3.x"
+    echo "Streaming Server serial number."
+    echo ""
+    echo "Please enter the serial number."
+    SERIALNUM=$currentSN
+    ret=0
+    if [ ! -z $key2 ]; then
+       get_serialnumber ret "-t 35 -p $cwd/licenses/sif35.bin" $key2
+    elif [ ! -z $key1 ]; then
+       get_serialnumber ret "-t 35 -p $cwd/licenses/sif35.bin" $key1
+    else
+       get_serialnumber ret "-t 35 -p $cwd/licenses/sif35.bin"
+    fi
+
+    if [ $ret -eq "3005374" ]; then
+       return_val=1
+    elif [ $ret -eq "3005377" ]; then
+       return_val=1
+    elif [ $ret -eq "3005002" ]; then
+       return_val=1
+    else
+       return_val=0
+    fi
+
+    if [ $return_val -eq 1 ]; then
+       echo ""
+       echo "Congratulations,  you have enabled the"
+       echo "Adobe Flash Media Streaming Server!"
+       echo ""
+       SERIALNUM="$currentSN;$SERIALNUM"
+       endGetSN=1
+    else
+       # check 30 key
+	   ret=0
+	   if [ ! -z $key2 ]; then
+		 ret=`$cwd/checksn -k $currentSN -t 30 -p $cwd/licenses/sif.bin $key2`
+       elif [ ! -z $key1 ]; then
+         ret=`$cwd/checksn -k $currentSN -t 30 -p $cwd/licenses/sif.bin $key1`
+       else
+         ret=`$cwd/checksn -k $currentSN -t 30 -p $cwd/licenses/sif.bin`
+       fi
+
+       if [ $ret -eq "3000374" ]; then
+         return_val=1
+       elif [ $ret -eq "3000377" ]; then
+         return_val=1
+       elif [ $ret -eq "3000002" ]; then
+         return_val=1
+       else
+         return_val=0
+       fi
+
+	   if [ $return_val -eq 1 ]; then
+         echo ""
+         echo "Congratulations, you have enabled the"
+         echo "Adobe Flash Media Streaming Server!"
+         echo ""
+         SERIALNUM="$currentSN;$SERIALNUM"
+         endGetSN=1
+       else
+         echo ""
+         echo "An invalid serial number was entered during the"
+         echo "upgrade process. Falling back to the "
+         echo "Adobe Flash Media Development Server."
+         echo ""
+         tryagain
+       fi
+    fi
+    ;;
+    "4005377")
+      echo ""
+    echo "You have entered an upgrade serial number for Adobe Flash Media Server $VERSION."
+    echo "The serial number entered requries a valid Adobe Flash Media Server 3.x"
+    echo "Interactive Server serial number."
+      echo ""
+      echo "Please enter the serial number."
+    SERIALNUM=$currentSN
+      ret=0
+    if [ ! -z $key2 ]; then
+       get_serialnumber ret "-t 30 -p $cwd/licenses/sif.bin" $key2
+    elif [ ! -z $key1 ]; then
+       get_serialnumber ret "-t 30 -p $cwd/licenses/sif.bin" $key1
+      else
+       get_serialnumber ret "-t 30 -p $cwd/licenses/sif.bin"
+      fi
+
+    if [ $ret -eq "3000003" ]; then
+        return_val=1
+    elif [ $ret -eq "3000373" ]; then
+        return_val=1
+    elif [ $ret -eq "3000376" ]; then
+        return_val=1
+    else
+        return_val=0
+    fi
+
+     if [ $return_val -eq 1 ]; then
+        echo ""
+        echo "Congratulations,  you have enabled the"
+        echo "Adobe Flash Media Interactive Server!"
+        echo ""
+        SERIALNUM="$currentSN;$SERIALNUM"
+        endGetSN=1
+      else
+        # check 35 key
+	    ret=0
+	    if [ ! -z $key2 ]; then
+		 ret=`$cwd/checksn -k $currentSN -t 35 -p $cwd/licenses/sif35.bin $key2`
+        elif [ ! -z $key1 ]; then
+         ret=`$cwd/checksn -k $currentSN -t 35 -p $cwd/licenses/sif35.bin $key1`
+        else
+         ret=`$cwd/checksn -k $currentSN -t 35 -p $cwd/licenses/sif35.bin`
+        fi
+
+        if [ $ret -eq "3005003" ]; then
+          return_val=1
+        elif [ $ret -eq "3005373" ]; then
+          return_val=1
+        elif [ $ret -eq "3005376" ]; then
+          return_val=1
+        else
+         return_val=0
+      fi
+
+	  if [ $return_val -eq 1 ]; then
+         echo ""
+         echo "Congratulations, you have enabled the"
+         echo "Adobe Flash Media Interactive Server!"
+         echo ""
+         SERIALNUM="$currentSN;$SERIALNUM"
+         endGetSN=1
+      else
+         echo ""
+         echo "An invalid serial number was entered during the"
+         echo "upgrade process. Falling back to the "
+         echo "Adobe Flash Media Development Server."
+         echo ""
+         tryagain
+      fi
+    fi
+    ;;
+    "4005378")
+    echo ""
+    echo "You have entered an upgrade serial number for Adobe Flash Media Server $VERSION."
+    echo "The serial number entered requries a valid Adobe Flash Media Server 3.x"
+    echo "Streaming Server serial number."
+    echo ""
+    echo "Please enter the serial number."
+    SERIALNUM=$currentSN
+    ret=0
+    if [ ! -z $key2 ]; then
+       get_serialnumber ret "-t 30 -p $cwd/licenses/sif.bin" $key2
+    elif [ ! -z $key1 ]; then
+       get_serialnumber ret "-t 30 -p $cwd/licenses/sif.bin" $key1
+    else
+       get_serialnumber ret "-t 30 -p $cwd/licenses/sif.bin"
+    fi
+
+     if [ $ret -eq "3000374" ]; then
+        return_val=1
+    elif [ $ret -eq "3000377" ]; then
+        return_val=1
+    elif [ $ret -eq "3000002" ]; then
+        return_val=1
+    else
+        return_val=0
+    fi
+
+    if [ $return_val -eq 1 ]; then
+      echo ""
+      echo "Congratulations, you have enabled the"
+      echo "Adobe Flash Media Streaming Server!"
+      echo ""
+      SERIALNUM="$currentSN;$SERIALNUM"
+      endGetSN=1
+    else
+      # check 35 key
+	  ret=0
+	  if [ ! -z $key2 ]; then
+		 ret=`$cwd/checksn -k $currentSN -t 35 -p $cwd/licenses/sif35.bin $key2`
+      elif [ ! -z $key1 ]; then
+         ret=`$cwd/checksn -k $currentSN -t 35 -p $cwd/licenses/sif35.bin $key1`
+      else
+         ret=`$cwd/checksn -k $currentSN -t 35 -p $cwd/licenses/sif35.bin`
+      fi
+
+      if [ $ret -eq "3005374" ]; then
+        return_val=1
+      elif [ $ret -eq "3005377" ]; then
+        return_val=1
+      elif [ $ret -eq "3005002" ]; then
+        return_val=1
+      else
+        return_val=0
+      fi
+
+	  if [ $return_val -eq 1 ]; then
+         echo ""
+         echo "Congratulations, you have enabled the"
+         echo "Adobe Flash Media Streaming Server!"
+         echo ""
+         SERIALNUM="$currentSN;$SERIALNUM"
+         endGetSN=1
+      else
+         echo ""
+         echo "An invalid serial number was entered during the"
+         echo "upgrade process. Falling back to the "
+         echo "Adobe Flash Media Development Server."
+         echo ""
+         tryagain
+      fi
+    fi
+    ;;
+    "4005379")
+    echo ""
+    echo "You have entered an upgrade serial number for Adobe Flash Media Server $VERSION."
+    echo "The serial number entered requries a valid Adobe Flash Media Server 4.0"
+    echo "Enterprise Server serial number."
+    echo ""
+    echo "Please enter the serial number."
+    SERIALNUM=$currentSN
+    ret=0
+    if [ ! -z $key2 ]; then
+       get_serialnumber ret "-t 40 -p $cwd/licenses/sif40.bin" $key2
+    elif [ ! -z $key1 ]; then
+       get_serialnumber ret "-t 40 -p $cwd/licenses/sif40.bin" $key1
+    else
+       get_serialnumber ret "-t 40 -p $cwd/licenses/sif40.bin"
+    fi
+
+    if [ $ret -eq "4000462" ]; then
+        return_val=1
+    else
+        return_val=0
+    fi
+
+    if [ $return_val -eq 1 ]; then
+      echo ""
+      echo "Congratulations, you have enabled the"
+      echo "Adobe Flash Media Enterprise Server!"
+      echo ""
+      SERIALNUM="$currentSN;$SERIALNUM"
+      endGetSN=1
+    else
+      echo ""
+      echo "An invalid serial number was entered during the"
+      echo "upgrade process. Falling back to the "
+      echo "Adobe Flash Media Development Server."
+      echo ""
+      tryagain
+    fi
+    ;;
+    "4005380")
+    echo ""
+    echo "You have entered an upgrade serial number for Adobe Flash Media Server $VERSION."
+    echo "The serial number entered requries a valid Adobe Flash Media Server 4.0"
+    echo "Interactive Server serial number."
+    echo ""
+    echo "Please enter the serial number."
+    SERIALNUM=$currentSN
+    ret=0
+    if [ ! -z $key2 ]; then
+       get_serialnumber ret "-t 40 -p $cwd/licenses/sif40.bin" $key2
+    elif [ ! -z $key1 ]; then
+       get_serialnumber ret "-t 40 -p $cwd/licenses/sif40.bin" $key1
+    else
+       get_serialnumber ret "-t 40 -p $cwd/licenses/sif40.bin"
+    fi
+
+    if [ $ret -eq "4000373" ]; then
+        return_val=1
+    elif [ $ret -eq "4000375" ]; then
+        return_val=1
+    elif [ $ret -eq "4000377" ]; then
+        return_val=1
+    else
+        return_val=0
+    fi
+
+    if [ $return_val -eq 1 ]; then
+      echo ""
+      echo "Congratulations, you have enabled the"
+      echo "Adobe Flash Media Interactive Server!"
+      echo ""
+      SERIALNUM="$currentSN;$SERIALNUM"
+      endGetSN=1
+    else
+      echo ""
+      echo "An invalid serial number was entered during the"
+      echo "upgrade process. Falling back to the "
+      echo "Adobe Flash Media Development Server."
+      echo ""
+      tryagain
+    fi
+    ;;
+    "4005381")
+    echo ""
+    echo "You have entered an upgrade serial number for Adobe Flash Media Server $VERSION."
+    echo "The serial number entered requries a valid Adobe Flash Media Server 4.0"
+    echo "Streaming Server serial number."
+    echo ""
+    echo "Please enter the serial number."
+    SERIALNUM=$currentSN
+    ret=0
+    if [ ! -z $key2 ]; then
+       get_serialnumber ret "-t 40 -p $cwd/licenses/sif40.bin" $key2
+    elif [ ! -z $key1 ]; then
+       get_serialnumber ret "-t 40 -p $cwd/licenses/sif40.bin" $key1
+    else
+       get_serialnumber ret "-t 40 -p $cwd/licenses/sif40.bin"
+    fi
+
+     if [ $ret -eq "4000374" ]; then
+        return_val=1
+    elif [ $ret -eq "4000376" ]; then
+        return_val=1
+    elif [ $ret -eq "4000378" ]; then
+        return_val=1
+    else
+        return_val=0
+    fi
+
+    if [ $return_val -eq 1 ]; then
+      echo ""
+      echo "Congratulations, you have enabled the"
+      echo "Adobe Flash Media Streaming Server!"
+      echo ""
+      SERIALNUM="$currentSN;$SERIALNUM"
+      endGetSN=1
+    else
+      echo ""
+      echo "An invalid serial number was entered during the"
+      echo "upgrade process. Falling back to the "
+      echo "Adobe Flash Media Development Server."
+      echo ""
+      tryagain
+    fi
+    ;;
+    "4005373")
+      echo ""
+      echo "Congratulations.  You have enabled the"
+      echo "Adobe Flash Media Interactive Server!"
+      echo ""
+	  SERIALNUM=$currentSN
+      endGetSN=1
+    ;;
+    "4005374")
+    echo ""
+    echo "Congratulations.  You have enabled the"
+    echo "Adobe Flash Media Streaming Server!"
+    echo ""
+    SERIALNUM=$currentSN
+    endGetSN=1
+    ;;
+     "4005462")
+    echo ""
+    echo "Congratulations.  You have enabled the"
+    echo "Adobe Flash Media Enterprise Server!"
+    echo ""
+    SERIALNUM=$currentSN
+    endGetSN=1
+    ;;
+    "253")
+    echo ""
+    echo "You have not entered a serial number.  Falling back to"
+    echo "the Adobe Flash Media Development Server!"
+    echo ""
+    tryagain
+    ;;
+    "254")
+    echo ""
+    echo "There was an error trying to determine the"
+    echo "serial number type.  Falling back to the"
+    echo "Adobe Flash Media Development Server."
+    echo ""
+    tryagain
+    ;;
+    "255")
+    echo ""
+    echo "You have entered an invalid serial number.  Falling back to"
+    echo "the Adobe Flash Media Server Developer Edition."
+    echo ""
+    tryagain
+    ;;
+    "1")
+    echo ""
+    echo "You have entered an invalid serial number.  Falling back to"
+    echo "the Adobe Flash Media Server Developer Edition."
+    echo ""
+    tryagain
+    ;;
+    "0")
+    echo ""
+    echo "You have entered an invalid serial number.  Falling back to"
+    echo "the Adobe Flash Media Server Developer Edition."
+    echo ""
+    tryagain
+    ;;
+    *) echo ""
+      echo "An an unexpected error occurred."
+    echo "Please seek help from Adobe.  Falling back to the"
+    echo "Adobe Flash Media Development Server."
+    echo ""
+    tryagain
+    ;;
+  esac
+  done
+
+
+
+  ############################
+  # Get destination directory
+  ############################
+  echo ""
+  echo "$PRODUCT $VERSION requires approximately 200MB of"
+  echo "disk space."
+  echo ""
+  echo "The installer will install $PRODUCT $VERSION in the"
+  echo "following directory"
+  printf "Default [$INSTALLDIR]: "
+  read dir
+
+  if [ ! -z "$dir" ]; then
+    INSTALLDIR="$dir"
+  fi
+
+  ask_to_overwrite () {
+    echo ""
+    echo ""
+    echo "WARNING: The installer has detected a previous installation."
+    echo ""
+    echo "Old conf files would be backed up. Do you want the installer to overwrite"
+    echo "the previous installation with this installation,"
+    echo "or quit this installer? (y/q)"
+    printf "Default [y]: "
+    read yn
+
+    # if user pressed return, use default
+    if [ -z "$yn" ]; then
+  yn=Y
+    fi
+
+    case $yn in
+  y | Y) OVERWRITE=1
+       ;;
+  q | Q) exit
+       ;;
+    *) echo ""
+       echo "Please enter 'y' or 'q'."
+       ask_to_overwrite
+       ;;
+    esac
+  }
+
+  # check directory
+  if [ \( -d "$INSTALLDIR" \) -a \( -f "$INSTALLDIR/fmsmaster" \) ]; then
+    ask_to_overwrite
+  else
+    # check for prev installation (allow overwrite)
+  if [ -s "$SERVICES_DIR" ]; then
+    ask_to_overwrite
+  else
+    # check if there is an old installation (don't allow overwrite)
+    if [ -s "/etc/adobe/fcs/services" ]; then
+      prev_install_found() {
+      echo ""
+      echo ""
+      echo "WARNING: The installer has detected an old installation."
+      echo ""
+      echo "You must uninstall the old installation before continuing."
+      exit
+      }
+      prev_install_found
+    fi
+  fi
+  fi
+
+
+  ############
+  # Get ports
+  ############
+  # Get Server port
+  echo ""
+  echo ""
+  echo "The $PRODUCT communicates on the IANA-assigned"
+  echo "port of 1935, which is the port most Flash applications expect,"
+  echo "and can also communicate on port 80"
+  echo "over RTMPT, HTTP webserver proxy, and for HTTP Dynamic Streaming origin services."
+  get_serverport () {
+    FMS_SERVER_PORT=1935,80
+    echo ""
+    echo "Please enter the $PRODUCT port(s), comma-separated"
+    printf "Default [$FMS_SERVER_PORT]: "
+    read in
+
+    if [ ! -z "$in" ]; then
+      FMS_SERVER_PORT=$in
+    fi
+
+    # check if valid ports have been entered; if multiple ports are specified
+    # they need to be comma delimited
+    echo $FMS_SERVER_PORT|grep " " > /dev/null 2>&1
+    RET=$?
+    if [ $RET -eq 0 ]; then
+     echo ""
+     echo "ERROR: Spaces are not permitted in the server port."
+     echo ""
+     get_serverport
+    fi
+
+
+    `$cwd/fmsini -checkports $FMS_SERVER_PORT`
+    RET=$?
+    if [ $RET -ne 0 ] && [ $RET -ne 1 ]; then
+      echo ""
+      echo "ERROR: You have entered an invalid port : $FMS_SERVER_PORT"
+      echo "       Ports must be greater than 0 and less than 65536."
+      echo "       If multiple ports are specified, they must be"
+      echo "       separated by a comma. Please enter a valid port."
+      echo ""
+      get_serverport
+    fi
+
+  }
+  get_serverport
+
+  # Get Admin port
+  get_adminport () {
+    ADMIN_SERVER_PORT=1111
+    echo ""
+    echo "Please enter the port to use for the Admin service. You can only specify one"
+    echo "admin port."
+    printf "Default [$ADMIN_SERVER_PORT]: "
+    read in
+
+    if [ ! -z "$in" ]; then
+      ADMIN_SERVER_PORT=$in
+    fi
+
+    # check if valid ports have been entered; if multiple ports are specified
+    # they need to be comma delimited
+    echo $ADMIN_SERVER_PORT|grep " " > /dev/null 2>&1
+    RET=$?
+    if [ $RET -eq 0 ]; then
+     echo ""
+     echo "ERROR: Spaces are not permitted in the admin port."
+     echo ""
+     get_adminport
+    fi
+
+    `$cwd/fmsini -checkports $ADMIN_SERVER_PORT`
+    RET=$?
+    if [ $RET -ne 0 ] && [ $RET -ne 1 ]; then
+      echo ""
+      echo "ERROR: You have entered an invalid port : $ADMIN_SERVER_PORT"
+      echo "       Ports must be greater than 0 and less than 65536."
+      echo "       If multiple ports are specified, they must be"
+      echo "       separated by a comma. Please enter a valid port."
+      echo ""
+      get_adminport
+    fi
+  }
+  get_adminport
+
+  #############################
+  # Get admin user information
+  #############################
+  echo ""
+  echo ""
+  echo "The administrative user name and password you provide here is required to use"
+  echo "the $PRODUCT Management Console for"
+  echo "administration, monitoring, and debugging."
+
+  # get administrative username
+  get_username () {
+    echo ""
+    printf "Please enter the administrative username: "
+    read in
+
+    if [ ! -z "$in" ]; then
+      ADMINNAME=$in
+    else
+      echo ""
+      echo "Please do not enter a blank username."
+      get_username
+    fi
+  }
+  get_username
+
+  # get administrative password
+  stty -echo
+  while [ 1 ]; do
+    echo ""
+    printf "For increased security, enter a password of at least 8 characters. \nPlease enter the administrative password: "
+    read in
+    if [ `echo -n $in | wc -c` -lt 8 ]; then
+        echo ""
+        echo "ERROR: The Administrator password must be at least 8 characters long."
+    else
+      echo ""
+      printf "Confirm password: "
+      read in_confirm
+      if [ "X$in" != "X$in_confirm" ]; then
+        echo ""
+        echo "ERROR: Passwords do not match."
+      else
+        break
+      fi
+    fi
+  done
+  stty echo
+
+  ADMINPASSWORD=$in
+
+  ################
+  # Get run user
+  ################
+  echo ""
+  ask_fms_create_user () {
+    echo ""
+    echo ""
+    echo "User \"$PROCESS_OWNER\" does not exist. Do you want to create it?(y/n)"
+    printf "Default [y]: "
+    read yn
+
+    # if user pressed return, use default
+    if [ -z "$yn" ]; then
+    yn=Y
+    fi
+
+    case $yn in
+    y | Y) FMS_CREATE_USER=1
+         ;;
+    n | N) FMS_CREATE_USER=0
+         ;;
+      *) echo ""
+         echo "Please enter 'y' or 'n'."
+         ask_fms_create_user
+         ;;
+    esac
+  }
+  get_run_user () {
+    echo ""
+    echo ""
+    echo "When the $PRODUCT service is started, the service"
+    echo "can be run as a user other than \"root\". The server would change to this user"
+    echo "when the server is started and has acquired its ports."
+    echo ""
+    echo "Please enter the user that the $PRODUCT service will run as"
+    printf "Default user [$DEFAULT_PROCESS_OWNER]: "
+    read in
+    PROCESS_OWNER=$DEFAULT_PROCESS_OWNER
+	FMS_CREATE_USER=0
+    if [ ! -z "$in" ]; then
+      PROCESS_OWNER="$in"
+    fi
+    id $PROCESS_OWNER > /dev/null 2>&1
+    if [ $? -ne 0 ]; then
+    	ask_fms_create_user
+		if [ $FMS_CREATE_USER -eq 1 ]; then
+			OWNER_GROUP=$PROCESS_OWNER
+			echo ""
+			echo "Please enter a valid user group for the \"$PROCESS_OWNER\" user."
+			printf "Default group [$OWNER_GROUP]:"
+			read in
+    		if [ -n "$in" ]; then
+    			OWNER_GROUP=$in
+    		fi
+			exact_match="^$OWNER_GROUP$"
+			if [ -z `cat /etc/group | cut -d":" -f1 | grep '$exact_match'` ]; then
+    			echo "Group \"$OWNER_GROUP\" does not exist!.  This installer will create one ..."
+				groupadd -f "$OWNER_GROUP"
+			fi
+			if [ -n `cat /etc/group | cut -d":" -f1 | grep '$exact_match'` ]; then
+				useradd -g "$OWNER_GROUP" -c "FMS Process Owner" "$PROCESS_OWNER"
+			fi
+		fi
+    fi
+
+    # check if valid id
+    id $PROCESS_OWNER > /dev/null 2>&1
+    if [ $? -ne 0 ]; then
+      echo ""
+      echo "ERROR: \"$PROCESS_OWNER\" is not a valid user."
+      echo "       Please enter a valid user."
+      get_run_user
+    fi
+    if [ $FMS_CREATE_USER -eq 1 ]; then
+      echo "User \"$PROCESS_OWNER\" created and added to group \"$OWNER_GROUP\""
+    fi
+  }
+
+    DEFAULT_PROCESS_OWNER=fms
+    PROCESS_OWNER=$DEFAULT_PROCESS_OWNER
+    get_run_user
+
+  # Process owner is also owner of the files
+  OWNER=$PROCESS_OWNER
+
+  #######################
+  # Get run user's group
+  #######################
+  ask_for_group () {
+    OWNER_GROUP=""
+    echo ""
+    printf "Please enter a valid user group for the \"$PROCESS_OWNER\" user: "
+    DEFAULT_GROUP=`groups $PROCESS_OWNER  | egrep -o '[^ ]*$'`
+    printf "Default group [$DEFAULT_GROUP]: "
+
+    read in
+
+    if [ -z "$in" ]; then
+      in="$DEFAULT_GROUP"
+    fi
+
+    # validate user group
+    groups $PROCESS_OWNER | grep "\b$in\b" > /dev/null 2>&1
+    if [ $? -ne 0 ]; then
+      echo ""
+      echo "ERROR: \"$PROCESS_OWNER\" is not in the user group \"$in\""
+      ask_for_group
+    else
+      OWNER_GROUP="$in"
+    fi
+  }
+  if [ $FMS_CREATE_USER -ne 1 ]; then
+  	ask_for_group
+  fi
+
+
+  ##################
+  # ask if apache
+  ##################
+  ask_apache() {
+    echo ""
+    echo ""
+    echo "Do you want to install apache? (y/n)"
+    printf "Default [y]: "
+    read yn
+
+    if [ -z "$yn" ];then
+      yn="y"
+    fi
+
+    case $yn in
+      y | Y) APACHE_INSTALL=1
+             ;;
+      n | N) APACHE_INSTALL=0
+             ;;
+          *) echo ""
+             echo "Please enter 'y' or 'n'."
+             ask_apache
+             ;;
+    esac
+  }
+  ask_apache
+
+  echo ""
+  get_apache_user () {
+    echo ""
+    echo ""
+    echo "Apache is started as root but once it has acquired its port it starts the worker"
+    echo " processes as a non-priviledged user. "
+    echo ""
+    echo "Please enter the user that Apache will eventually run as."
+    printf "Default user [$DEFAULT_APACHE_OWNER]: "
+    read in
+
+    if [ ! -z "$in" ]; then
+      APACHE_OWNER="$in"
+    fi
+
+    # check if valid id
+    id $APACHE_OWNER > /dev/null 2>&1
+    if [ $? -ne 0 ]; then
+      echo ""
+      echo "ERROR: \"$APACHE_OWNER\" is not a valid user."
+      echo "       Please enter a valid user."
+      get_apache_user
+    fi
+
+    if [ $APACHE_OWNER == "root" ]; then
+      echo ""
+      echo "ERROR: It is a security risk to run Apache with root priviledges "
+      echo "       Please enter a valid user."
+      get_apache_user
+    fi
+
+  }
+
+if [ $APACHE_INSTALL -eq 1 ]; then
+  DEFAULT_APACHE_OWNER=$OWNER
+  APACHE_OWNER=$DEFAULT_APACHE_OWNER
+  get_apache_user
+fi
+
+  # run as daemon
+  ask_daemon () {
+    echo ""
+    echo ""
+    echo "Do you want the $PRODUCT service to run as a"
+    echo "daemon? (y/n)"
+    printf "Default [y]: "
+    read yn
+
+    if [ -z "$yn" ];then
+      yn="Y"
+    fi
+
+    case $yn in
+      y | Y) RUN_AS_DAEMON=1
+             ;;
+      n | N) RUN_AS_DAEMON=0
+             ;;
+          *) echo ""
+             echo "Please enter 'y' or 'n'."
+             ask_daemon
+             ;;
+    esac
+  }
+  ask_daemon
+
+  # start after installation
+  ask_start () {
+    echo ""
+    echo ""
+    echo "Do you want to start the $PRODUCT"
+    echo "after the installation is done? (y/n)"
+    printf "Default [y]: "
+    read yn
+
+    if [ -z "$yn" ];then
+      yn="Y"
+    fi
+
+    case $yn in
+      y | Y) START=1
+             ;;
+      n | N) START=0
+             ;;
+          *) echo ""
+             echo "Please enter 'y' or 'n'."
+             ask_start
+             ;;
+    esac
+  }
+  ask_start
+
+
+
+  ##########
+  # Summary
+  ##########
+  echo ""
+  echo ""
+  echo "----------- Install Action Summary -----------"
+  echo ""
+  if [ $OVERWRITE -eq 1 ]; then
+  echo "WARNING: You have chosen to overwrite a previous installation."
+  echo ""
+  fi
+  echo "Installation directory         = $INSTALLDIR"
+  echo ""
+  echo "Adobe Flash Media Server Port        = $FMS_SERVER_PORT"
+  echo "Adobe Flash Media Admin Server Port  = $ADMIN_SERVER_PORT"
+  echo ""
+  if [ $APACHE_INSTALL -eq 1 ]; then
+  echo "Apache Install                 = Yes"
+  echo ""
+  fi
+  echo
+  echo "Administrative username        = $ADMINNAME"
+  echo "Administrative password        = (suppressed)"
+  echo ""
+  echo "service owner                  = $OWNER"
+  echo ""
+  echo "service user                   = $PROCESS_OWNER"
+  echo "service group                  = $OWNER_GROUP"
+  if [ $RUN_AS_DAEMON -eq 1 ]; then
+  echo ""
+  echo "Run as daemon                  = Yes"
+  fi
+  if [ $START -eq 1 ]; then
+  echo "Start Adobe Flash Media Server       = Yes"
+  fi
+  echo ""
+
+  # okay to continue?
+  get_installagreement () {
+    printf 'Proceed with the installation? (y/n/q): '
+    read yn
+
+    case $yn in
+      y | Y) okToProceed=1
+             ;;
+      n | N) continue
+             ;;
+      q | Q) exit 1
+             ;;
+          *) echo ""
+             echo "Please enter 'y', 'n', or 'q'."
+             get_installagreement
+             ;;
+    esac
+  }
+  get_installagreement
+
+done
+
+############################################
+# if overwrite, shutdown services in case
+############################################
+if [ $OVERWRITE -eq 1 ] && [ -d $INSTALLDIR ]; then
+  pushd "$INSTALLDIR"
+  fmsmgr server $SERVICE_NAME stop
+  fmsmgr adminserver stop
+  popd
+fi
+
+
+
+#######################
+# Backup conf files
+#######################
+CURRENT_TIME=`date +"%m_%d_%Y_%H_%M_%S"`
+if [ -d "$INSTALLDIR/conf" ]; then
+    cp -r $INSTALLDIR/conf $INSTALLDIR/conf_backup_$CURRENT_TIME
+fi
+if [ -d "$INSTALLDIR/Apache2.2/conf" ]; then
+    cp -r $INSTALLDIR/Apache2.2/conf $INSTALLDIR/Apache2.2/conf_backup_$CURRENT_TIME
+fi
+
+#######################
+# Perform installation
+#######################
+
+# create installation directory
+mkdir -p $INSTALLDIR
+
+# copy files
+echo ""
+echo "Installing $PRODUCT files..."
+
+cp -f $cwd/fmsmaster $INSTALLDIR
+cp -f $cwd/fmsedge $INSTALLDIR
+cp -f $cwd/fmscore $INSTALLDIR
+cp -f $cwd/fmsadmin $INSTALLDIR
+cp -f $cwd/fmsmgr $INSTALLDIR
+cp -f $cwd/libfmsccme.so $INSTALLDIR
+cp -f $cwd/libcrypto.so.1.0.0 $INSTALLDIR
+cp -f $cwd/libssl.so.1.0.0 $INSTALLDIR
+cp -f $cwd/uninstallFMS $INSTALLDIR
+cp -f $cwd/tcSrvMsg $INSTALLDIR
+cp -rf $cwd/conf $INSTALLDIR
+cp -rf $cwd/webroot $INSTALLDIR
+cp -r $cwd/samples $INSTALLDIR
+cp -r $cwd/phds $INSTALLDIR
+cp -r $cwd/phls $INSTALLDIR
+cp -f $cwd/adminserver $INSTALLDIR
+cp -f $cwd/server $INSTALLDIR
+cp -r $cwd/modules $INSTALLDIR
+cp -f $cwd/License.txt $INSTALLDIR
+cp -f $cwd/License.htm $INSTALLDIR
+cp -f $cwd/readme.htm $INSTALLDIR
+cp -f $cwd/shmrd $INSTALLDIR
+cp -f $cwd/libadbe_dme.so $INSTALLDIR
+cp -f $cwd/libadbe_flv.so $INSTALLDIR
+
+    cp -f $cwd/libasneu.so.1 $INSTALLDIR
+    cp -rf $cwd/licenses $INSTALLDIR
+
+# copy tools
+mkdir -p "$INSTALLDIR/tools"
+cp -f $cwd/far $INSTALLDIR/tools
+cp -rf $cwd/tools $INSTALLDIR
+
+mkdir -p "$INSTALLDIR/tools/f4fpackager"
+cp -f $cwd/f4fpackager $INSTALLDIR/tools/f4fpackager
+cp -f $cwd/f4fpackager_config.xml $INSTALLDIR/tools/f4fpackager
+cp -f $cwd/libexpat.so.1 $INSTALLDIR/tools/f4fpackager
+cp -f $cwd/libadbe_dme.so $INSTALLDIR/tools/f4fpackager
+cp -f $cwd/libadbe_flv.so $INSTALLDIR/tools/f4fpackager
+
+# copy components
+cp -rf $cwd/scriptlib $INSTALLDIR
+
+# copy docs
+cp -rf $cwd/documentation $INSTALLDIR
+
+# create applications directory
+mkdir -p "$INSTALLDIR/applications"
+#cp -rf $cwd/applications/* $INSTALLDIR/applications
+
+# configure FMS configuration files
+echo "Configuring $PRODUCT..."
+
+# set license profile
+$cwd/fmsini -chgtag $INSTALLDIR/conf/fms.ini SERVER.LICENSEINFO $SERIALNUM > /dev/null 2>&1
+
+# set admin info
+$cwd/fmsini -chgtag $INSTALLDIR/conf/fms.ini SERVER.ADMIN_USERNAME $ADMINNAME > /dev/null 2>&1
+
+# set admin server port
+$cwd/fmsini -chgtag $INSTALLDIR/conf/fms.ini SERVER.ADMINSERVER_HOSTPORT :$ADMIN_SERVER_PORT > /dev/null 2>&1
+
+# set server port
+$cwd/fmsini -chgtag $INSTALLDIR/conf/fms.ini ADAPTOR.HOSTPORT :$FMS_SERVER_PORT > /dev/null 2>&1
+
+# set scriptlib path
+$cwd/fmsini -chgtag $INSTALLDIR/conf/fms.ini APP.JS_SCRIPTLIBPATH $INSTALLDIR/scriptlib > /dev/null 2>&1
+
+# set applications path
+$cwd/fmsini -chgtag $INSTALLDIR/conf/fms.ini VHOST.APPSDIR $INSTALLDIR/applications > /dev/null 2>&1
+
+# set live path
+$cwd/fmsini -chgtag $INSTALLDIR/conf/fms.ini LIVE_DIR $INSTALLDIR/applications/live > /dev/null 2>&1
+
+# set vod_common path
+$cwd/fmsini -chgtag $INSTALLDIR/conf/fms.ini VOD_COMMON_DIR $INSTALLDIR/webroot/vod > /dev/null 2>&1
+
+# set vod path
+$cwd/fmsini -chgtag $INSTALLDIR/conf/fms.ini VOD_DIR $INSTALLDIR/applications/vod/media > /dev/null 2>&1
+
+#set trusted file list
+mkdir -p "/home/$USERID/.macromedia/Flash_Player/#Security/FlashPlayerTrust"
+echo "$INSTALLDIR/samples/videoPlayer/swfs/StrobeMediaPlayback.swf" > "/home/$USERID/.macromedia/Flash_Player/#Security/FlashPlayerTrust/FlashMediaServer.cfg"
+
+echo "$INSTALLDIR/webroot/swfs/adobedemoplayer_pc.swf" >> "/home/$USERID/.macromedia/Flash_Player/#Security/FlashPlayerTrust/FlashMediaServer.cfg"
+
+# save scramble text
+$cwd/scramble -KeyGen 16 > $INSTALLDIR/phds/common-key.bin
+$cwd/scramble -KeyGen 16 > $INSTALLDIR/phls/liveeventkey.bin
+$cwd/scramble -KeyGen 16 > $INSTALLDIR/phls/vodkey.bin
+
+# set uid and gid
+OWNER_ID=`id $PROCESS_OWNER | sed -e 's/).*//; s/(.*//; s/^.*=//;'`
+OWNER_GROUP_ID=`cat /etc/group | grep "^$OWNER_GROUP:" | cut -f3 -d:`
+$cwd/fmsini -chgtag $INSTALLDIR/conf/fms.ini SERVER.PROCESS_UID $OWNER_ID > /dev/null 2>&1
+$cwd/fmsini -chgtag $INSTALLDIR/conf/fms.ini SERVER.PROCESS_GID $OWNER_GROUP_ID > /dev/null 2>&1
+
+# copy livepkgr
+mkdir -p "$INSTALLDIR/applications/livepkgr" > /dev/null 2>&1
+cp -rf $cwd/applications/livepkgr $INSTALLDIR/applications
+
+# copy multicast
+mkdir -p "$INSTALLDIR/applications/multicast" > /dev/null 2>&1
+cp -rf $cwd/applications/multicast $INSTALLDIR/applications
+
+if [ $APACHE_INSTALL -eq 1 ]; then
+  $cwd/fmsini -chgtag $INSTALLDIR/conf/fms.ini SERVER.HTTPD_ENABLED true > /dev/null 2>&1
+else
+  $cwd/fmsini -chgtag $INSTALLDIR/conf/fms.ini SERVER.HTTPD_ENABLED false > /dev/null 2>&1
+fi
+
+# modify help_data.txt files
+if [ $INSTALL_EXAMPLES -eq 1 ]; then
+  if [ "$INSTALLDIR" = "$WEBPUB" ]; then
+    echo "targetSamples=$INSTALLDIR&targetHelp=$INSTALLDIR&adminInstall=1&inFlash=0&helpProtocol=file:///" > $INSTALLDIR/fms_help/html/help_data.txt
+    echo "targetSamples=$INSTALLDIR&targetHelp=$INSTALLDIR&adminInstall=1&inFlash=0&helpProtocol=file:///" > $INSTALLDIR/fms_help/html/admin/help_data.txt
+  else
+    echo "targetSamples=$WEBPUB/fms&targetHelp=$INSTALLDIR&adminInstall=1&inFlash=0&helpProtocol=file:///" > $INSTALLDIR/fms_help/html/help_data.txt
+    echo "targetSamples=$WEBPUB/fms&targetHelp=$INSTALLDIR&adminInstall=1&inFlash=0&helpProtocol=file:///" > $INSTALLDIR/fms_help/html/admin/help_data.txt
+  fi
+fi
+
+mkdir -p "$INSTALLDIR/applications/vod" > /dev/null 2>&1
+cp -rf $cwd/applications/vod $INSTALLDIR/applications
+
+mkdir -p "$INSTALLDIR/applications/live" > /dev/null 2>&1
+cp -rf $cwd/applications/live $INSTALLDIR/applications
+
+if [ $APACHE_INSTALL -eq 1 ]; then
+cp -rf $cwd/Apache2.2 $INSTALLDIR
+cp -f $cwd/libexpat.so.1 $INSTALLDIR/Apache2.2/modules
+mkdir -p $INSTALLDIR/Apache2.2/logs
+mkdir -p $INSTALLDIR/Apache2.2/cacheroot
+sed -i "s/^User nobody/User $APACHE_OWNER/" $INSTALLDIR/Apache2.2/conf/httpd.conf
+fi
+
+# create /etc/adobe/fms/services dir
+if [ $CREATE_ETC_MACR_DIR -eq 1 ]; then
+  mkdir -p "$SERVICES_DIR"
+fi
+
+# add FMS service
+$INSTALLDIR/fmsmgr add $SERVICE_NAME $INSTALLDIR
+
+# user chooses to use this Admin Server
+if [ ! -f "$SERVICES_DIR/fmsadmin" ]; then
+  $INSTALLDIR/fmsmgr setAdmin $SERVICE_NAME
+else
+  if [ $SWITCH_ADMIN -eq 1 ]; then
+    # set FMS Admin server as Primary Admin
+    $INSTALLDIR/fmsmgr setAdmin $SERVICE_NAME
+  fi
+fi
+
+# modify uninstaller
+cat $INSTALLDIR/uninstallFMS | sed -e "s%^SERVICE_NAME=%SERVICE_NAME=$SERVICE_NAME%g" | sed -e "s%^INSTALLDIR=%INSTALLDIR=$INSTALLDIR%g" | sed -e "s%^WEBPUB=%WEBPUB=$WEBPUB%g" | sed -e "s%^APPDEST=%APPDEST=$INSTALLDIR%g" > $INSTALLDIR/uninstallFMS.tmp
+mv $INSTALLDIR/uninstallFMS.tmp $INSTALLDIR/uninstallFMS
+chmod +x $INSTALLDIR/uninstallFMS
+
+# create services location file
+echo "$SERVICES_DIR" > "$INSTALLDIR/.services"
+
+# link libcap.so.2 for Debian
+if [ $LINK_LIBCAP2 -eq 1 ]; then
+  ln -sf /lib/libcap.so.2 $INSTALLDIR/libcap.so.1
+  if [ $INSTALL_32_ON_64 -eq 1 ] && [ -f /lib32/libcap.so.2 ]; then
+    ln -sf /lib32/libcap.so.2 $INSTALLDIR/libcap.so.1
+  fi
+fi
+
+# change ownership of files
+# chown -R $OWNER $INSTALLDIR
+chown -R $OWNER $INSTALLDIR/conf
+chown -R $OWNER $INSTALLDIR/applications
+
+# change group of files
+# chgrp -R $OWNER_GROUP $INSTALLDIR
+chgrp -R $OWNER_GROUP $INSTALLDIR/conf
+chgrp -R $OWNER_GROUP $INSTALLDIR/applications
+
+# change ownership and group of Apache files
+if [ $APACHE_INSTALL -eq 1 ]; then
+  chown -R $APACHE_OWNER $INSTALLDIR/Apache2.2
+  chown -R $APACHE_OWNER $INSTALLDIR/webroot
+  chgrp -R `id -gn $APACHE_OWNER` $INSTALLDIR/Apache2.2
+  chgrp -R `id -gn $APACHE_OWNER` $INSTALLDIR/webroot
+fi
+
+# change ownership of files if necessary
+chmod -R 755 $INSTALLDIR
+chmod -R 750 $INSTALLDIR/conf
+find $INSTALLDIR/conf -type f | xargs chmod a-x
+# add write permissions for record
+chmod -R 777 $INSTALLDIR/applications
+
+# run as daemon
+if [ $RUN_AS_DAEMON -eq 1 ]; then
+  # install rc2.d script
+  cp -f $cwd/fms /etc/init.d
+
+    if [ `check_distro` == "Debian" ]; then
+      update-rc.d fms start 20 3 4 5 . stop 20 0 1 2 6 .
+    else
+      # Linux only
+      /sbin/chkconfig --add fms
+    fi
+    $INSTALLDIR/fmsmgr setAutostart $SERVICE_NAME
+fi
+
+# reset the password for admin
+export LD_LIBRARY_PATH=".${LD_LIBRARY_PATH:+:}$LD_LIBRARY_PATH"
+pushd "$INSTALLDIR" > /dev/null
+echo $ADMINPASSWORD | ./fmsadmin -user $ADMINNAME -console -conf ./conf/Server.xml > /dev/null
+popd > /dev/null
+
+# start server service
+if [ $START -eq 1 ]; then
+  cd "$INSTALLDIR"
+  fmsmgr server $SERVICE_NAME start
+  fmsmgr adminserver start
+fi
+
+echo ""
+echo "The $PRODUCT installation is complete."
+echo ""
