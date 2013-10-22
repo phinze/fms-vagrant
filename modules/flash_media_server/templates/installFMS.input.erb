@@ -1,4 +1,4 @@
-<%= @serial_number %>
+<%= (@serial_number || '').empty? ? "\nn" : @serial_number %>
 <%= @install_dir %>
 <%= @ports %>
 <%= @admin_port %>

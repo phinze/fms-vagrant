@@ -1,23 +1,14 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-VAGRANTFILE_API_VERSION = "2"
+Vagrant.require_plugin 'landrush'
 
-def vmware?
-  !!(defined? Hashicorp)
-end
-
-def box_url
-  if vmware?
-    'http://files.vagrantup.com/precise64_vmware.box'
-  else
-    'http://files.vagrantup.com/precise64.box'
-  end
-end
-
-Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
+Vagrant.configure('2') do |config|
   config.vm.box     = 'precise64'
-  config.vm.box_url = box_url
+  config.vm.box_url = 'http://files.vagrantup.com/precise64.box'
+  config.vm.provider 'vmware_fusion' do |v, override|
+    override.vm.box_url = 'http://files.vagrantup.com/precise64_vmware.box'
+  end
 
   config.vm.network :private_network, ip: "10.30.1.33"
   config.vm.hostname = 'fms.vagrant.dev'
@@ -32,9 +23,6 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     puppet.manifests_path = 'manifests'
     puppet.module_path = 'modules'
     puppet.manifest_file = 'site.pp'
-    puppet.facter = {
-    'fms_serial' => ENV['FMS_SERIAL']
-    }
-
+    puppet.facter = {'fms_serial' => ENV['FMS_SERIAL']}
   end
 end
