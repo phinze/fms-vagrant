@@ -10,7 +10,7 @@ Vagrant.configure('2') do |config|
     override.vm.box_url = 'http://files.vagrantup.com/precise64_vmware.box'
   end
 
-  config.vm.network :private_network, ip: "10.30.1.33"
+  config.vm.network :private_network, ip: "10.50.1.55"
   config.vm.hostname = 'fms.vagrant.dev'
 
   config.landrush.enable

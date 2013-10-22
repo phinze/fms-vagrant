@@ -1,5 +1,5 @@
 class flash_media_server(
-  $serial_number,
+  $serial_number       = '',
   $install_dir         = '/opt/adobe/fms',
   $ports               = '1935,80',
   $admin_port          = '1111',
