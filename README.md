@@ -11,7 +11,6 @@ This will get you Flash Media Server (4.5) up and running on a VM at http://fms.
   * A happy vagrant - recent version supporting the v2 Vagrantfile syntax
   * A friendly [landrush][] plugin for DNS; if you don't have it, that's okay! Do this:
     1. `vagrant plugin install landrush` to download the plugin
-    2. `vagrant landrush install` to set up the DNS resolved on your host machine
 
 [landrush]: https://github.com/phinze/landrush
 
